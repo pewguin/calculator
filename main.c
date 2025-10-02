@@ -17,5 +17,6 @@ int main(int argc, char* argv[]) {
         }
     }
     ASTNode* root = parse_expression(expr);
+    // print_ast(root);
     printf("%g\n", evaluate(root));
 }

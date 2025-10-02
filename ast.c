@@ -132,7 +132,10 @@ Token* make_token_end() {
 }
 
 bool is_operator(char c) {
-   return c == '+' || c == '-' || c == '*' || c == 'x' || c == '/' || c == '(' || c == ')';
+   return c == '+' || c == '-' || c == '*' || c == 'x' || c == '/';
+}
+bool is_paren(char c) {
+    return c == '(' || c == ')';
 }
 
 double evaluate(const ASTNode* expr) {
@@ -172,7 +175,20 @@ Token** tokenize(char* expr) {
     while (*front != '\0') {
         char* new_front;
         double num = strtod(front, &new_front);
-        if (is_operator(*front)) {
+        if (is_paren(*front)) {
+            TokenType type;
+            switch (*new_front) {
+                case '(': type = TOK_LPAREN; break;
+                case ')': type = TOK_RPAREN; break;
+                default:
+                    printf("Undefined parethesis: %c\nDefaulting to left\n", *front);
+                    type = TOK_RPAREN;
+                    break;
+            }
+            arr[token_index] = make_token_paren(type);
+            ++token_index;
+            ++front;
+        } else if (is_operator(*front)) {
             TokenOperator oper;
             switch (*front) {
                 case '+': oper = TOK_ADD; break;
@@ -221,7 +237,9 @@ ASTNode* token_into_node(const Token* token) {
                 case TOK_NEG: return make_ast_unary(NULL, AST_U_NEGATE);
             }
             break;
-        default: return NULL;
+        default:
+            printf("failed to turn token into node");
+            return NULL;
     }
 }
 
@@ -230,6 +248,28 @@ void free_token_array(Token** tokens) {
         free(tokens[i]);
     }
     free(tokens);
+}
+
+void print_tokens(Token** tokens) {
+    for (int i = 0; tokens[i]->type != TOK_END; ++i) {
+        switch (tokens[i]->type) {
+            case TOK_NUMBER:
+                printf("NUMBER: %lf\n", tokens[i]->number);
+                break;
+            case TOK_OPERATOR:
+                printf("OPERATOR: %d\n", tokens[i]->oper);
+                break;
+            case TOK_LPAREN:
+                printf("LPAREN\n");
+                break;
+            case TOK_RPAREN:
+                printf("RPAREN\n");
+                break;
+            default:
+                printf("UNKNOWN %d\n", tokens[i]->type);
+                break;
+        }
+    }
 }
 
 ASTNode* create_ast(Token** tokens) {
@@ -246,8 +286,9 @@ ASTNode* create_ast(Token** tokens) {
                 push_node(&output_stack, make_ast_number(token->number));
                 break;
             case TOK_OPERATOR:
-                while (!is_empty_token(&operator_stack) && peek_token(&operator_stack)->prec >= token->prec) {
-                    ASTNode* old = token_into_node(pop_token(&operator_stack));
+                while (!is_empty_token(&operator_stack) && peek_token(&operator_stack)->type != TOK_LPAREN && peek_token(&operator_stack)->prec >= token->prec) {
+                    Token* tok = pop_token(&operator_stack);
+                    ASTNode* old = token_into_node(tok);
                     old->content.binary.rhs = pop_node(&output_stack);
                     old->content.binary.lhs = pop_node(&output_stack);
                     push_node(&output_stack, old);
